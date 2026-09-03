@@ -1,0 +1,294 @@
+---
+layout: post
+title: "Understanding t-SNE: From Intuition to Implementation"
+date: 2026-09-03
+categories: [machine-learning, dimensionality-reduction]
+tags: [tsne, visualization, unsupervised-learning, data-science]
+excerpt: "A deep dive into t-SNE — why it exists, how it actually works under the hood, and how to use (and not misuse) it."
+---
+
+# Understanding t-SNE: From Intuition to Implementation
+
+High-dimensional data is everywhere — word embeddings with hundreds of dimensions, image features with thousands, single-cell gene expression data with tens of thousands. Humans can't look at 500-dimensional space and "see" structure in it. **t-SNE (t-distributed Stochastic Neighbor Embedding)** is one of the most popular tools for solving this problem: it takes high-dimensional data and produces a 2D or 3D map that (hopefully) preserves the local structure of that data, so you can actually look at it.
+
+This post covers t-SNE in two passes:
+
+1. **Intuition** — what problem it solves and why it works, with no equations required.
+2. **The rigorous version** — the actual math, the algorithm, an implementation from scratch, and practical guidance (including its well-known pitfalls).
+
+---
+
+## Part 1: Intuition
+
+### The problem t-SNE solves
+
+Imagine you have a dataset of handwritten digits (like MNIST), where each image is a point in 784-dimensional space (28×28 pixels). You want to know: *do images of the same digit cluster together?* You can't plot 784 dimensions. You need to compress each point down to 2 dimensions while preserving something meaningful — ideally, **points that were close together in 784-D should still be close together in 2-D**.
+
+This is the general problem of **dimensionality reduction for visualization**. PCA (Principal Component Analysis) is the classic tool, but PCA only preserves *global* linear structure — it finds directions of maximum variance. It's bad at preserving *local* neighborhoods when the data lies on a curved, twisted manifold (think of a Swiss roll shape). t-SNE was designed specifically to preserve **local neighborhood structure**, at the cost of not preserving global distances faithfully.
+
+### The core idea
+
+t-SNE's central trick is:
+
+1. In the **original high-dimensional space**, define a probability distribution over pairs of points such that similar points have a *high probability* of being picked as neighbors, and dissimilar points have a low probability. This is done using a Gaussian centered on each point.
+2. In the **low-dimensional map** (2D, say), define a similar probability distribution over pairs of points — but using a heavier-tailed distribution (the Student t-distribution with one degree of freedom, i.e. the Cauchy distribution).
+3. Move the points around in the 2D map until the two distributions match as closely as possible (measured by KL divergence).
+
+In other words: t-SNE converts distances into probabilities of being "neighbors," and then tries to lay out points in 2D so that the neighbor probabilities match as well as possible.
+
+### Why a different distribution in low-D?
+
+This is the "t" in t-SNE, and it's the key innovation over the earlier "SNE" algorithm. If you used a Gaussian in both spaces, you'd run into the **crowding problem**: in high dimensions there's a lot more "room" for many points to be moderately far from a given point, but in 2D there just isn't enough area to place all of them at moderate distance — points get crushed together in the center.
+
+The fix: use a heavy-tailed distribution (Student-t with 1 degree of freedom) in the low-dimensional space. This distribution assigns higher probability to points being far apart, meaning moderately dissimilar points get pushed further apart in the map, which frees up space in the middle for genuinely nearby points to cluster tightly. This is what gives t-SNE its characteristic well-separated, tight clusters.
+
+### What perplexity means, intuitively
+
+t-SNE has one main knob: **perplexity**, usually between 5 and 50. Intuitively, perplexity is "the number of effective nearest neighbors" a point considers when deciding what counts as a neighborhood. A low perplexity means each point only "cares" about a few very close neighbors (revealing fine local structure); a high perplexity means it considers a broader neighborhood (revealing coarser structure). There's no universally correct value — it's worth trying several.
+
+### Important caveats before you use it
+
+- **Cluster sizes in a t-SNE plot mean nothing.** t-SNE roughly equalizes cluster sizes; a tight cluster in the plot doesn't mean the underlying data is tightly packed.
+- **Distances between clusters mean very little.** The gap between two clusters in a t-SNE map isn't proportional to how different they really are.
+- **It's stochastic.** Different runs (different random seeds) give different-looking layouts. Always check reproducibility across runs before drawing conclusions.
+- **It's a visualization tool, not a general-purpose dimensionality reduction step for downstream models.** Feeding t-SNE output into another ML model is usually a bad idea.
+
+If you only read Part 1, you already know enough to use t-SNE responsibly. Part 2 is for people who want to know exactly what's happening mathematically and computationally.
+
+---
+
+## Part 2: The Rigorous Version
+
+### 2.1 From distances to probabilities (high-dimensional space)
+
+For each pair of points $x_i, x_j$ in the original high-dimensional space, define the conditional probability that $x_i$ would pick $x_j$ as its neighbor, under a Gaussian centered at $x_i$:
+
+$$
+p_{j|i} = \frac{\exp(-\lVert x_i - x_j \rVert^2 / 2\sigma_i^2)}{\sum_{k \neq i} \exp(-\lVert x_i - x_k \rVert^2 / 2\sigma_i^2)}
+$$
+
+Note that $\sigma_i$ is chosen **per point** $i$, not globally. This matters: it lets t-SNE adapt to regions of varying density. In a dense region, $\sigma_i$ should be small; in a sparse region, it should be larger.
+
+To make this symmetric (needed for the low-D matching step), define:
+
+$$
+p_{ij} = \frac{p_{j|i} + p_{i|j}}{2n}
+$$
+
+where $n$ is the number of points. This symmetrized version is what the original 2008 paper (van der Maaten & Hinton) actually uses.
+
+### 2.2 Choosing $\sigma_i$ via perplexity
+
+The per-point bandwidth $\sigma_i$ is chosen so that the **perplexity** of the conditional distribution $P_i$ equals a user-specified target value:
+
+$$
+\text{Perp}(P_i) = 2^{H(P_i)}, \qquad H(P_i) = -\sum_j p_{j|i} \log_2 p_{j|i}
+$$
+
+$H(P_i)$ is the Shannon entropy of the distribution. Since perplexity is monotonic in $\sigma_i$, this is solved numerically per point with a binary search: try a $\sigma_i$, compute the resulting perplexity, adjust up or down, repeat until it matches the target (usually within a small tolerance, in well under 50 iterations).
+
+### 2.3 The low-dimensional distribution
+
+In the low-dimensional embedding, let $y_i$ be the (learnable) 2D or 3D coordinates for each point. Define the pairwise similarity using a Student-t distribution with one degree of freedom (equivalent to a Cauchy distribution):
+
+$$
+q_{ij} = \frac{(1 + \lVert y_i - y_j \rVert^2)^{-1}}{\sum_{k \neq l} (1 + \lVert y_k - y_l \rVert^2)^{-1}}
+$$
+
+This is symmetric by construction and heavy-tailed — exactly the property that solves the crowding problem described in Part 1.
+
+### 2.4 The objective function
+
+t-SNE minimizes the Kullback–Leibler divergence between the joint distribution $P$ in high-D and $Q$ in low-D:
+
+$$
+C = KL(P \parallel Q) = \sum_{i \neq j} p_{ij} \log \frac{p_{ij}}{q_{ij}}
+$$
+
+This is minimized over the embedding positions $\{y_i\}$ using gradient descent. Because KL divergence is asymmetric, this objective heavily penalizes using a *small* $q_{ij}$ to model a *large* $p_{ij}$ (i.e., putting truly similar points far apart in the map is punished a lot), but is comparatively forgiving about putting dissimilar points close together. This asymmetry is exactly why t-SNE preserves local structure much better than global structure — it's baked into the loss function itself.
+
+### 2.5 The gradient
+
+The gradient of the cost function with respect to a single embedded point $y_i$ has a clean closed form:
+
+$$
+\frac{\partial C}{\partial y_i} = 4 \sum_{j \neq i} (p_{ij} - q_{ij})(y_i - y_j)(1 + \lVert y_i - y_j \rVert^2)^{-1}
+$$
+
+This has a nice physical interpretation: it's like a set of springs between every pair of points. If $p_{ij} > q_{ij}$ (points should be closer than they currently are), the "spring" pulls $y_i$ and $y_j$ together; if $p_{ij} < q_{ij}$, it pushes them apart. The $(1 + \lVert y_i-y_j\rVert^2)^{-1}$ term (from the Student-t) means far-apart points exert very weak force, which is why the optimization is numerically stable even in a heavy-tailed space.
+
+### 2.6 The full algorithm
+
+1. Compute pairwise affinities $p_{j|i}$ in high-D using a per-point Gaussian, calibrated to a target perplexity via binary search on $\sigma_i$.
+2. Symmetrize to get $p_{ij}$.
+3. Initialize low-D points $y_i$ randomly (small values near the origin), or via PCA for a more stable start.
+4. Repeat for a fixed number of iterations (typically 500–1000):
+   - Compute $q_{ij}$ from current $y_i$.
+   - Compute gradient $\partial C/\partial y_i$.
+   - Update $y_i$ with gradient descent, momentum, and (in the first ~250 iterations) an "early exaggeration" trick: multiply all $p_{ij}$ by a constant (e.g. 4 or 12) so that clusters form more aggressively early on, before relaxing back to the true values.
+5. Return final $\{y_i\}$ as the 2D/3D embedding.
+
+### 2.7 Computational cost and approximations
+
+Naively, computing all pairwise $p_{ij}$ and $q_{ij}$ is $O(n^2)$ in both time and memory — this becomes intractable above roughly 10,000 points. Two standard fixes:
+
+- **Barnes-Hut t-SNE**: approximates the repulsive forces between distant points using a quadtree/octree, similar to how N-body gravity simulations are sped up, reducing complexity to $O(n \log n)$. This is what scikit-learn uses by default for larger datasets.
+- **FIt-SNE / opt-SNE**: further acceleration using Fast Fourier Transform-based approximations, making t-SNE practical for millions of points.
+
+### 2.8 Implementation
+
+#### Using scikit-learn (the practical approach)
+
+```python
+import numpy as np
+from sklearn.manifold import TSNE
+from sklearn.datasets import load_digits
+import matplotlib.pyplot as plt
+
+digits = load_digits()
+X, y = digits.data, digits.target
+
+tsne = TSNE(
+    n_components=2,
+    perplexity=30,
+    learning_rate="auto",
+    init="pca",
+    random_state=42,
+)
+X_embedded = tsne.fit_transform(X)
+
+plt.figure(figsize=(8, 8))
+scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=y, cmap="tab10", s=15)
+plt.legend(*scatter.legend_elements(), title="Digit")
+plt.title("t-SNE of MNIST digits")
+plt.show()
+```
+
+A few practically important arguments:
+- `init="pca"` gives a deterministic, more globally-stable starting point than random init (reduces run-to-run variance in global layout).
+- `learning_rate="auto"` uses the heuristic from later t-SNE research (`max(N / early_exaggeration / 4, 50)`), which is more robust than the old fixed default of 200.
+- Always try several `perplexity` values (e.g. 5, 30, 50) and several random seeds before trusting a single plot.
+
+#### From-scratch implementation (for understanding, not production)
+
+```python
+import numpy as np
+
+def compute_pairwise_affinities(X, perplexity=30.0, tol=1e-5):
+    n = X.shape[0]
+    sum_X = np.sum(np.square(X), axis=1)
+    D = sum_X[:, None] + sum_X[None, :] - 2 * X @ X.T
+    P = np.zeros((n, n))
+    target_entropy = np.log2(perplexity)
+
+    for i in range(n):
+        beta_min, beta_max = -np.inf, np.inf
+        beta = 1.0
+        Di = np.delete(D[i], i)
+
+        for _ in range(50):
+            Pi = np.exp(-Di * beta)
+            sum_Pi = np.sum(Pi)
+            Pi = Pi / sum_Pi if sum_Pi > 0 else Pi
+            H = -np.sum(Pi * np.log2(Pi + 1e-12))
+
+            if abs(H - target_entropy) < tol:
+                break
+            if H > target_entropy:
+                beta_min = beta
+                beta = beta * 2 if beta_max == np.inf else (beta + beta_max) / 2
+            else:
+                beta_max = beta
+                beta = beta / 2 if beta_min == -np.inf else (beta + beta_min) / 2
+
+        P[i, np.arange(n) != i] = Pi
+
+    P = (P + P.T) / (2 * n)
+    return np.maximum(P, 1e-12)
+
+def tsne_fit(X, n_components=2, perplexity=30.0, n_iter=1000, lr=200.0):
+    n = X.shape[0]
+    P = compute_pairwise_affinities(X, perplexity)
+    P *= 4.0  # early exaggeration
+
+    Y = np.random.randn(n, n_components) * 1e-4
+    Y_prev1, Y_prev2 = Y.copy(), Y.copy()
+    momentum = 0.5
+
+    for it in range(n_iter):
+        sum_Y = np.sum(np.square(Y), axis=1)
+        num = 1.0 / (1.0 + sum_Y[:, None] + sum_Y[None, :] - 2 * Y @ Y.T)
+        np.fill_diagonal(num, 0.0)
+        Q = np.maximum(num / np.sum(num), 1e-12)
+
+        PQ_diff = P - Q
+        grad = np.zeros_like(Y)
+        for i in range(n):
+            grad[i] = 4.0 * np.sum(
+                (PQ_diff[:, i] * num[:, i])[:, None] * (Y[i] - Y), axis=0
+            )
+
+        Y_new = Y - lr * grad + momentum * (Y_prev1 - Y_prev2)
+        Y_prev2, Y_prev1, Y = Y_prev1, Y, Y_new
+
+        if it == 100:
+            P /= 4.0  # stop early exaggeration
+        if it == 250:
+            momentum = 0.8
+
+    return Y
+```
+
+This scales as $O(n^2)$ per iteration and is meant purely as a teaching reference — for real datasets, use scikit-learn's Barnes-Hut implementation or `openTSNE`.
+
+### 2.9 t-SNE vs. PCA vs. UMAP
+
+| | PCA | t-SNE | UMAP |
+|---|---|---|---|
+| Preserves | Global linear variance | Local neighborhood structure | Local + more global structure than t-SNE |
+| Deterministic | Yes | No (stochastic) | Mostly (some stochastic init) |
+| Speed | Very fast | Slow ($O(n^2)$, or $O(n\log n)$ with Barnes-Hut) | Faster than t-SNE, scales better |
+| Cluster distances meaningful | Somewhat | No | Partially |
+| Good for | Preprocessing, quick linear structure | Visual exploration of clusters | Visual exploration + some quantitative use |
+
+In practice: use PCA first to reduce, say, 500 dimensions down to 30–50 (denoising, speeding up t-SNE), then run t-SNE or UMAP on that reduced representation for visualization.
+
+### 2.10 Practical checklist
+
+- Standardize/normalize features before running t-SNE if they're on different scales.
+- Reduce dimensionality with PCA first if the input has hundreds+ of dimensions.
+- Try perplexity values roughly between 5 and 50; for larger datasets, err toward higher values.
+- Run with multiple random seeds — if the cluster structure isn't stable across seeds, don't over-interpret it.
+- Never use cluster size or inter-cluster distance in a t-SNE plot as a quantitative claim.
+- For very large datasets (100k+ points), use Barnes-Hut t-SNE, `openTSNE`, or consider UMAP instead.
+
+---
+
+## Further reading
+
+- van der Maaten, L. & Hinton, G. (2008). *Visualizing Data using t-SNE*. Journal of Machine Learning Research.
+- van der Maaten, L. (2014). *Accelerating t-SNE using Tree-Based Algorithms*. JMLR. (The Barnes-Hut paper.)
+- Wattenberg, M., Viégas, F., & Johnson, I. (2016). *How to Use t-SNE Effectively*. Distill.pub — an excellent interactive exploration of t-SNE's pitfalls.
+
+---
+
+*If you found this useful, I'll likely follow up with a similar deep dive on UMAP, since the two are so often compared.*
+---
+
+<div align="center">
+  <h3>Connect & Follow</h3>
+  <p>
+    <a href="https://github.com/soltsega" target="_blank">
+      <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
+    </a>
+    <a href="https://linkedin.com/in/solomontsega" target="_blank">
+      <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
+    </a>
+    <a href="https://x.com/solomontgs" target="_blank">
+      <img src="https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white" alt="X" />
+    </a>
+    <a href="https://t.me/CompileTimeThoughts" target="_blank">
+      <img src="https://img.shields.io/badge/Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram" />
+    </a>
+  </p>
+</div>
