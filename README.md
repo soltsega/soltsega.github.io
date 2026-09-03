@@ -26,12 +26,31 @@ Whether you are a researcher, a student, or a data science practitioner, you'll 
 
 I'm always open to discussing machine learning, software engineering, and interesting tech problems. Feel free to connect with me!
 
-- **Portfolio:** [solomontsega-portfolio-website.vercel.app](https://solomontsega-portfolio-website.vercel.app/)
-- **GitHub:** [@soltsega](https://github.com/soltsega)
-- **LinkedIn:** [Solomon Tsega](https://linkedin.com/in/solomontsega)
-- **X (Twitter):** [@solomontgs](https://x.com/solomontgs)
-- **Telegram:** [CompileTimeThoughts](https://t.me/CompileTimeThoughts)
-- **Substack:** [@solomontsega](https://substack.com/@solomontsega)
+---
+
+<div align="center">
+  <h3>Connect & Follow</h3>
+  <p>
+    <a href="https://solomontsega-portfolio-website.vercel.app/" target="_blank">
+      <img src="https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Portfolio" />
+    </a>
+    <a href="https://github.com/soltsega" target="_blank">
+      <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
+    </a>
+    <a href="https://linkedin.com/in/solomontsega" target="_blank">
+      <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
+    </a>
+    <a href="https://x.com/solomontgs" target="_blank">
+      <img src="https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white" alt="X" />
+    </a>
+    <a href="https://t.me/CompileTimeThoughts" target="_blank">
+      <img src="https://img.shields.io/badge/Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram" />
+    </a>
+    <a href="https://substack.com/@solomontsega" target="_blank">
+      <img src="https://img.shields.io/badge/Substack-FF6719?style=for-the-badge&logo=substack&logoColor=white" alt="Substack" />
+    </a>
+  </p>
+</div>
 
 ---
 
