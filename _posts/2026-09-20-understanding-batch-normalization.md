@@ -7,9 +7,6 @@ tags: [batch-normalization, neural-networks, training-stability, regularization]
 excerpt: "Why batch normalization was invented, what it actually does mathematically, and how to implement and use it correctly."
 ---
 
-
-# Understanding Batch Normalization: From Intuition to Implementation
-
 Batch normalization (BatchNorm) is one of the few ideas in deep learning that's both nearly universal in practice and still genuinely debated in theory. It was introduced in 2015 to make deep networks train faster and more reliably, and it's now a default layer in most CNN architectures. This post covers it in two passes: intuition first, then the full math, gradients, and implementation.
 
 ---
