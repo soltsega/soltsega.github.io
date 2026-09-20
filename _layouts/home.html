@@ -1,0 +1,47 @@
+---
+layout: default
+---
+
+<section class="home-hero">
+  <div class="hero-badge">Machine Learning &amp; Deep Learning</div>
+  <h1 class="hero-title">
+    Deep Dives into<br>
+    <span class="gradient-text">ML &amp; Mathematics</span>
+  </h1>
+  <p class="hero-subtitle">
+    Rigorous explorations from intuition to implementation — covering algorithms,
+    mathematics, and code that actually runs.
+  </p>
+  <div class="hero-divider"></div>
+</section>
+
+<section class="posts-section">
+  <div class="section-header">
+    <h2 class="section-title">Latest Posts</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="posts-grid">
+    {% for post in site.posts %}
+    <article class="post-card">
+      <div class="post-tags">
+        {% for cat in post.categories %}
+        <span class="post-tag">{{ cat }}</span>
+        {% endfor %}
+      </div>
+      <h3 class="post-card-title">
+        <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+      </h3>
+      <p class="post-card-excerpt">
+        {{ post.excerpt | strip_html | truncate: 160 }}
+      </p>
+      <div class="post-card-footer">
+        <span class="post-card-date">{{ post.date | date: "%b %d, %Y" }}</span>
+        <a href="{{ post.url | relative_url }}" class="post-card-link">
+          Read more <span>→</span>
+        </a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
