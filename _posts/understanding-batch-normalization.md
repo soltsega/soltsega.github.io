@@ -7,16 +7,6 @@ tags: [batch-normalization, neural-networks, training-stability, regularization]
 excerpt: "Why batch normalization was invented, what it actually does mathematically, and how to implement and use it correctly."
 ---
 
-<!-- MathJax script for rendering LaTeX equations -->
-<script>
-  window.MathJax = {
-    tex: {
-      inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$', '$$'], ['\\[', '\\]']]
-    }
-  };
-</script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
 # Understanding Batch Normalization: From Intuition to Implementation
 

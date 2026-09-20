@@ -1,0 +1,15 @@
+title: "My Data Science Blog"
+description: "Deep dives into machine learning, math, and implementation."
+url: "https://soltsega.github.io"
+
+theme: minima
+
+markdown: kramdown
+kramdown:
+  math_engine: mathjax
+
+plugins:
+  - jekyll-feed
+
+# Make MathJax available to all pages via a custom head include
+mathjax: true
