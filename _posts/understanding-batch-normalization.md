@@ -7,6 +7,17 @@ tags: [batch-normalization, neural-networks, training-stability, regularization]
 excerpt: "Why batch normalization was invented, what it actually does mathematically, and how to implement and use it correctly."
 ---
 
+<!-- MathJax script for rendering LaTeX equations -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+    }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
 # Understanding Batch Normalization: From Intuition to Implementation
 
 Batch normalization (BatchNorm) is one of the few ideas in deep learning that's both nearly universal in practice and still genuinely debated in theory. It was introduced in 2015 to make deep networks train faster and more reliably, and it's now a default layer in most CNN architectures. This post covers it in two passes: intuition first, then the full math, gradients, and implementation.
@@ -162,6 +173,69 @@ Two details worth calling out:
 - `bias=False` on the convolution: since BatchNorm re-centers with its own learned $\beta$, a separate conv bias term is redundant and is usually dropped.
 - The `model.train()` / `model.eval()` switch is what controls whether BatchNorm uses batch statistics or running statistics — forgetting this before evaluation is one of the most common PyTorch bugs.
 
+#### Using TensorFlow/Keras — image recognition on MNIST
+
+A simple, readable example that puts BatchNorm between every dense layer — exactly the pattern that shows its effect most clearly:
+
+```python
+import tensorflow as tf
+from tensorflow import keras
+
+# ── 1. Load and split data ────────────────────────────────────────────────────
+(X_train_full, y_train_full), (X_test, y_test) = keras.datasets.mnist.load_data()
+
+# Reserve the first 5 000 samples as a validation set; normalise to [0, 1]
+X_valid, X_train = X_train_full[:5000] / 255.0, X_train_full[5000:] / 255.0
+y_valid, y_train = y_train_full[:5000],          y_train_full[5000:]
+X_test = X_test / 255.0
+
+# ── 2. Build the model ────────────────────────────────────────────────────────
+model = keras.models.Sequential([
+    keras.layers.Flatten(input_shape=[28, 28]),
+    keras.layers.BatchNormalization(),          # normalise raw pixel inputs
+    keras.layers.Dense(300, activation="relu"),
+    keras.layers.BatchNormalization(),          # normalise before next layer
+    keras.layers.Dense(100, activation="relu"),
+    keras.layers.BatchNormalization(),          # normalise before output
+    keras.layers.Dense(10, activation="softmax"),
+])
+
+model.summary()
+
+# ── 3. Compile ────────────────────────────────────────────────────────────────
+model.compile(
+    optimizer="sgd",
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy"],
+)
+
+# ── 4. Train ──────────────────────────────────────────────────────────────────
+history = model.fit(
+    X_train, y_train,
+    epochs=10,
+    validation_data=(X_valid, y_valid),
+)
+
+# ── 5. Evaluate ───────────────────────────────────────────────────────────────
+# model.evaluate() automatically uses running statistics — no extra step needed
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print(f"Test accuracy: {acc:.4f}")   # typically ~97–98 %
+
+# ── 6. Predict a single image ─────────────────────────────────────────────────
+import numpy as np
+sample = X_test[0:1]                           # keep batch dimension: (1, 28, 28)
+probs  = model.predict(sample, verbose=0)[0]   # inference mode: uses running stats
+print(f"Predicted digit: {np.argmax(probs)}  "
+      f"(confidence: {probs.max():.2%})")
+```
+
+A few things to notice here:
+
+- **BatchNorm on the inputs.** The very first `BatchNormalization()` layer normalises the raw (already scaled) pixel values before the first `Dense`. This is especially useful when input features have different scales, though for MNIST — which is already uniform — the effect is mild.
+- **BatchNorm between hidden layers.** Each `BatchNormalization()` re-centres and re-scales the pre-activation values of the *next* layer, stabilising the training signal as it propagates deeper.
+- **No `bias=False` needed here.** Unlike `Conv2D`, Keras's `Dense` layers placed *before* a `BatchNormalization` could have `use_bias=False` (the BN $\beta$ subsumes it), but for this simple demo it's omitted for readability.
+- **Inference is automatic.** `model.predict()` and `model.evaluate()` use the running mean/variance accumulated during training — no `model.eval()` call needed (unlike PyTorch).
+
 #### From-scratch implementation (for understanding, not production)
 
 ```python
@@ -230,7 +304,7 @@ This mirrors the equations in Section 2.3 directly, term by term, so it doubles 
 | Typical use case | CNNs (large batch) | Transformers, RNNs | CNNs with small batches | Style transfer |
 | Needs running stats for inference | Yes | No | No | No |
 
-### 2.8 Practical checklist
+### 2.8 Notes I would like to share
 
 - Place BatchNorm between the linear/conv layer and the activation function; drop the linear/conv layer's bias term.
 - Always call `model.train()` / `model.eval()` correctly around training vs. evaluation/inference code.
