@@ -29,4 +29,37 @@
     };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+
+  <!-- Copy Code Button Script -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("pre.highlight, div.highlighter-rouge pre").forEach((block) => {
+        // Only add button if the parent is relatively positioned (or make it relative)
+        let wrapper = block.parentNode;
+        if (wrapper.tagName !== "DIV" || !wrapper.classList.contains("highlight")) {
+          wrapper = block; 
+        }
+        
+        wrapper.style.position = "relative";
+        
+        const button = document.createElement("button");
+        button.className = "copy-code-btn";
+        button.innerText = "Copy";
+
+        button.addEventListener("click", () => {
+          const code = block.querySelector("code") ? block.querySelector("code").innerText : block.innerText;
+          navigator.clipboard.writeText(code).then(() => {
+            button.innerText = "Copied!";
+            button.classList.add("copied");
+            setTimeout(() => {
+              button.innerText = "Copy";
+              button.classList.remove("copied");
+            }, 2000);
+          });
+        });
+
+        wrapper.appendChild(button);
+      });
+    });
+  </script>
 </head>

@@ -472,7 +472,7 @@ a:hover { color: var(--accent-2); }
   border: 1px solid rgba(99,102,241,0.2);
 }
 
-.post-content pre {
+.post-content pre, div.highlighter-rouge {
   background: var(--code-bg) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
@@ -489,6 +489,39 @@ a:hover { color: var(--accent-2); }
   color: #e2e8f0 !important;
   font-size: 0.875rem;
   line-height: 1.7;
+}
+
+/* Copy button */
+.copy-code-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(99,102,241,0.15);
+  border: 1px solid rgba(99,102,241,0.3);
+  color: #a5b4fc;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition), background var(--transition), color var(--transition);
+}
+
+.post-content pre:hover .copy-code-btn,
+div.highlighter-rouge:hover .copy-code-btn {
+  opacity: 1;
+}
+
+.copy-code-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.copy-code-btn.copied {
+  background: #10b981; /* green */
+  color: #fff;
+  border-color: #10b981;
 }
 
 /* MathJax display equations */
