@@ -13,3 +13,6 @@ plugins:
 
 # Make MathJax available to all pages via a custom head include
 mathjax: true
+
+# Hide automatic page links in the top header (removes the redundant title)
+header_pages: []
